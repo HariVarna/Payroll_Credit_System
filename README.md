@@ -1,183 +1,316 @@
 # Payroll Credit System
 
-A classroom practical blockchain project implementing an administrative payroll configuration contract and an ERC-20 utility credit token (`PAYC`) on Ethereum using Solidity and Hardhat.
+A complete classroom practical Web3 project implementing an administrative payroll configuration contract and an ERC-20 utility credit token (`PAYC`) on Ethereum using Solidity and Hardhat.
 
 ---
 
-## 1. Project Objective
+## 1. Aim
 
-The objective of this project is to provide a solid, secure, and straightforward demonstration of Web3 backend engineering principles for payroll automation:
-- **Administrative Configuration (`PayrollConfig.sol`)**: Manages dynamic payroll rate settings protected by strict access control mechanisms.
-- **Utility Token (`PayrollCredit.sol`)**: An ERC-20 token standard implementation representing payroll disbursement units (`PAYC`) with an initial fixed supply minted to the treasury deployer.
-- **Classroom Practical Alignment**: Built with clarity, comprehensive automated tests, and industry-standard security patterns suitable for practical examinations and laboratory evaluations.
-
----
-
-## 2. Software & Tooling Versions
-
-- **Node.js**: `v24.17.0`
-- **npm**: `11.13.0`
-- **Hardhat**: `2.29.1` (Hardhat 2 stable release)
-- **Solidity (`solc`)**: `0.8.24` (EVM target: Paris)
-- **OpenZeppelin Contracts**: `@openzeppelin/contracts@5.2.0`
-- **Hardhat Toolbox**: `@nomicfoundation/hardhat-toolbox@5.0.0`
-- **Dotenv**: `dotenv@16.4.7`
+To design, develop, test, and prepare for deployment a decentralized **Payroll Credit System** composed of:
+1. An administrator-only configuration smart contract (`PayrollConfig.sol`) to manage global payroll disbursement rates.
+2. A standard ERC-20 utility token (`PayrollCredit.sol`) representing payroll credits (`PAYC`) with a fixed initial supply of 1,000,000 tokens minted to the treasury deployer.
+3. Automated test suites testing all state modifications, access controls, events, and transfer invariants.
+4. A deployment and source-verification pipeline for the Ethereum Sepolia testnet.
 
 ---
 
-## 3. Smart Contracts Description
+## 2. Requirements & Software Toolchain
+
+| Tool / Dependency | Version | Purpose |
+| :--- | :--- | :--- |
+| **Node.js** | `v24.17.0` | JavaScript runtime environment |
+| **npm** | `11.13.0` | Package manager |
+| **Hardhat** | `2.29.1` | Ethereum development environment (Hardhat 2 stable release) |
+| **Solidity (`solc`)** | `0.8.24` | Smart contract compiler (EVM target: `paris`) |
+| **OpenZeppelin Contracts** | `@openzeppelin/contracts@5.2.0` | Audited ERC-20 standard implementation |
+| **Hardhat Toolbox** | `@nomicfoundation/hardhat-toolbox@5.0.0` | Ethers v6, Mocha, Chai, and Etherscan verify plugin |
+| **Dotenv** | `dotenv@16.4.7` | Secure environment variable configuration |
+
+---
+
+## 3. Contract Descriptions
+
+### 3.1 `PayrollConfig.sol`
+- **Purpose**: Provides administrative control over global payroll configuration variables (such as base disbursement rates).
+- **Access Control**: Tracks the deployer as `admin`. Restricts rate modifications exclusively to the administrator using the `onlyAdmin` modifier.
+- **State Storage**: Encapsulates `uint256 private payrollRate`, initialized to `0`.
+- **Event Notification**: Emits `ConfigurationUpdated(uint256 newRate, address indexed updatedBy)` whenever the configuration is altered.
+
+### 3.2 `PayrollCredit.sol`
+- **Purpose**: Serves as the fungible ERC-20 payment asset for the payroll ecosystem.
+- **Token Specifications**:
+  - Name: `Payroll Credit`
+  - Symbol: `PAYC`
+  - Decimals: `18`
+  - Initial Supply: `1,000,000 PAYC` (`1,000,000 * 10^18` wei units)
+- **Minting Mechanism**: The entire initial supply is minted to the deployer wallet in the constructor. No external or unrestricted minting functions are exposed, guaranteeing a fixed supply cap.
+
+---
+
+## 4. Algorithms
+
+### Algorithm 1: Administrative Configuration (`PayrollConfig.sol`)
+1. **Deployment Phase (`constructor`)**:
+   - `admin ← msg.sender`
+   - `payrollRate ← 0`
+2. **Rate Update Phase (`setPayrollRate(newRate)`)**:
+   - If `msg.sender != admin`, revert with error `"PayrollConfig: caller is not the administrator"`.
+   - `payrollRate ← newRate`
+   - Emit event `ConfigurationUpdated(newRate, msg.sender)`
+3. **Rate Inquiry Phase (`getPayrollRate()`)**:
+   - Return `payrollRate`
+
+### Algorithm 2: ERC-20 Payroll Token (`PayrollCredit.sol`)
+1. **Deployment Phase (`constructor`)**:
+   - Initialize parent `ERC20("Payroll Credit", "PAYC")`
+   - Set constant `INITIAL_SUPPLY = 1,000,000 * 10^18`
+   - Invoke internal `_mint(msg.sender, INITIAL_SUPPLY)`
+   - Emit standard ERC-20 `Transfer(address(0), msg.sender, INITIAL_SUPPLY)`
+2. **Transfer Phase (`transfer(recipient, amount)`)**:
+   - Verify `balanceOf(msg.sender) >= amount` (otherwise revert with `ERC20InsufficientBalance`)
+   - `balanceOf(msg.sender) ← balanceOf(msg.sender) - amount`
+   - `balanceOf(recipient) ← balanceOf(recipient) + amount`
+   - Emit standard ERC-20 `Transfer(msg.sender, recipient, amount)`
+   - `totalSupply` remains constant
+
+---
+
+## 5. Important Functions and Their Purposes
 
 ### `PayrollConfig.sol`
-- **Administrator Assignment**: The deployer address is permanently assigned as the contract administrator at construction time (`admin = msg.sender`).
-- **State Storage**: Stores a `uint256 private payrollRate` initialized to `0`.
-- **Access Control**: Protected by the `onlyAdmin` modifier. Non-administrator attempts revert with `"PayrollConfig: caller is not the administrator"`.
-- **Public Getter**: `getPayrollRate()` provides read-only access to the configured payroll rate.
-- **Event Emission**: Emits `ConfigurationUpdated(uint256 newRate, address indexed updatedBy)` upon successful state change.
+- `constructor()`: Initializes the deployer address as `admin` and sets initial `payrollRate` to 0.
+- `setPayrollRate(uint256 newRate)`: Updates the stored payroll rate. Only accessible by `admin`.
+- `getPayrollRate()`: Public view function returning the currently active payroll rate.
+- `onlyAdmin()`: Modifier evaluating caller authorization prior to function execution.
 
 ### `PayrollCredit.sol`
-- **Standard**: ERC-20 token based on OpenZeppelin's audited implementation.
-- **Name**: `Payroll Credit`
-- **Symbol**: `PAYC`
-- **Decimals**: `18`
-- **Initial Supply**: `1,000,000 PAYC` (`1,000,000 * 10^18` wei units).
-- **Minting**: The entire initial supply is minted to the deployer address upon deployment; no arbitrary or unprotected minting functions exist.
+- `constructor()`: Sets token metadata and mints 1,000,000 PAYC to the deployer.
+- `transfer(address to, uint256 value)`: Transfers tokens from caller to recipient.
+- `balanceOf(address account)`: Returns token balance of the queried address.
+- `totalSupply()`: Returns the total circulating token supply.
+- `decimals()`: Returns the token decimal units (`18`).
 
 ---
 
-## 4. Installation Instructions
+## 6. Installation and Setup
 
-1. Clone the repository and navigate into the project directory:
+1. **Clone the repository:**
    ```bash
    git clone https://github.com/HariVarna/Multi-Sign-Salary-Distribution-System.git
    cd Multi-Sign-Salary-Distribution-System
    ```
 
-2. Install the project dependencies:
+2. **Install project dependencies:**
    ```bash
    npm install
    ```
 
----
-
-## 5. Compilation & Testing Commands
-
-### Compile Smart Contracts
-```bash
-npm run compile
-```
-*Direct Hardhat command:* `npx hardhat compile`
-
-### Run Automated Tests
-```bash
-npm test
-```
-*Direct Hardhat command:* `npx hardhat test`
-
-### Clean Build Cache
-```bash
-npm run clean
-```
-
----
-
-## 6. Test Suite & Coverage
-
-The automated test suite covers 17 test cases across 3 test files:
-
-### `test/PayrollConfig.test.js`
-- **Deployment & Initialization**:
-  - Verifies deployer is assigned as the administrator.
-  - Verifies initial payroll rate defaults to `0`.
-- **Payroll Rate Management**:
-  - Verifies the administrator can successfully call `setPayrollRate(newRate)`.
-  - Verifies public getter `getPayrollRate()` returns the updated value.
-  - Verifies the `ConfigurationUpdated` event is emitted with the correct arguments.
-  - Verifies that non-admin calls revert with `"PayrollConfig: caller is not the administrator"`.
-  - Verifies that failed unauthorized calls leave the stored rate unchanged.
-
-### `test/PayrollCredit.test.js`
-- **Token Metadata & Initial Supply**:
-  - Verifies name is `"Payroll Credit"`, symbol is `"PAYC"`, and decimals equal `18`.
-  - Verifies total supply equals `1,000,000 PAYC` (`1_000_000 * 10^18`).
-  - Verifies the full initial supply is minted to the deployer.
-  - Verifies non-deployer accounts start with zero balance.
-- **Standard ERC-20 Transfers**:
-  - Verifies successful token transfers emit the `Transfer` event.
-  - Verifies sender and recipient balances update accurately post-transfer.
-  - Verifies total supply remains constant after multiple transfers.
-  - Verifies transfers exceeding the sender's balance revert with `ERC20InsufficientBalance`.
-
-### `test/hardhat-setup.test.js`
-- Validates that the Hardhat Runtime Environment initializes signers and connects to local chain ID `31337`.
-
----
-
-## 7. Environment Configuration (.env)
-
-A `.env.example` file is included with template variables. To configure your environment for testnet deployment:
-
-1. Copy `.env.example` to `.env`:
+3. **Configure Environment Variables:**
    ```bash
    cp .env.example .env
    ```
-
-2. Populate the variables in `.env`:
+   Edit `.env` with your Sepolia RPC URL, deployer private key, and Etherscan API key:
    ```ini
-   # Sepolia RPC URL (from Alchemy, Infura, or any provider)
-   SEPOLIA_RPC_URL="https://eth-sepolia.g.alchemy.com/v2/your_alchemy_api_key"
-
-   # Deployer Private Key (Testnet only; NEVER expose or commit real keys)
-   PRIVATE_KEY="your_64_character_hex_private_key"
-
-   # Etherscan API Key for contract verification
-   ETHERSCAN_API_KEY="your_etherscan_api_key"
+   SEPOLIA_RPC_URL="https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY"
+   PRIVATE_KEY="YOUR_SEPOLIA_DEPLOYER_PRIVATE_KEY"
+   ETHERSCAN_API_KEY="YOUR_ETHERSCAN_API_KEY"
    ```
-
-> **Security Note:** `.env` is ignored by Git in `.gitignore`. Never commit private keys or API credentials.
 
 ---
 
-## 8. Deployment Instructions
+## 7. Compilation Commands & Output
 
-### Local In-Memory Deployment (Testing)
-To deploy locally for validation:
+To compile the smart contracts:
 ```bash
-npx hardhat run scripts/deploy.js
+npm run compile
 ```
 
-### Local Hardhat Node Deployment
-1. Start the local node in terminal 1:
-   ```bash
-   npm run node
-   ```
-2. Deploy contracts in terminal 2:
-   ```bash
-   npm run deploy:local
-   ```
+**Actual Output:**
+```text
+> payroll-credit-system@1.0.0 compile
+> hardhat compile
+
+Compiled 7 Solidity files successfully (evm target: paris).
+```
+
+---
+
+## 8. Test Commands & Actual Test Results
+
+To execute the complete automated test suite:
+```bash
+npm test
+```
+
+**Actual Terminal Output (17 passing test cases, 0 failures):**
+```text
+> payroll-credit-system@1.0.0 test
+> hardhat test
+
+  Hardhat Environment Setup
+    ✔ should initialize Hardhat runtime environment and provide test signers (720ms)
+    ✔ should retrieve network chain ID
+
+  PayrollConfig Contract
+    Deployment & Initialization
+      ✔ should record the deployer as administrator during deployment
+      ✔ should initialize the payroll configuration rate to zero
+    Payroll Rate Management
+      ✔ should allow the administrator to update the rate via setPayrollRate
+      ✔ should return the updated value through public getPayrollRate() getter
+      ✔ should emit a ConfigurationUpdated event when the value changes
+      ✔ should reject non-admin setter calls with proper revert reason (40ms)
+      ✔ should leave the stored value unchanged after a failed unauthorized call
+
+  PayrollCredit (PAYC) Token Contract
+    Token Metadata & Initial Supply
+      ✔ should verify token name, symbol, and decimals
+      ✔ should initialize total supply to exactly 1,000,000 PAYC
+      ✔ should mint the entire initial supply to the deployer balance
+      ✔ should report zero initial balance for other accounts
+    Standard ERC-20 Transfers
+      ✔ should execute a successful token transfer and emit Transfer event
+      ✔ should accurately update sender and recipient balances following a transfer
+      ✔ should maintain unchanged total supply across multiple transfers
+      ✔ should fail when transfer amount exceeds the sender's available balance
+
+  17 passing (1s)
+```
+
+---
+
+## 9. Deployment Commands
+
+### Local Deployment (Hardhat In-Memory / Localhost)
+```bash
+# Combined deployment:
+npx hardhat run scripts/deploy.js
+
+# Local standalone node:
+npm run node
+npm run deploy:local
+```
 
 ### Sepolia Testnet Deployment
-Ensure you have Sepolia testnet ETH in your deployer wallet and `.env` configured.
-
-#### Deploy Both Contracts:
 ```bash
+# Validate prerequisites before broadcasting:
+node scripts/check-env.js
+
+# Deploy both contracts to Sepolia:
 npm run deploy:sepolia
+
+# Or deploy individually:
+npm run deploy:config:sepolia
+npm run deploy:token:sepolia
 ```
-*Or via Hardhat:* `npx hardhat run scripts/deploy.js --network sepolia`
 
-#### Deploy Contracts Individually:
-- **Deploy PayrollConfig only:**
-  ```bash
-  npm run deploy:config:sepolia
-  ```
-- **Deploy PayrollCredit only:**
-  ```bash
-  npm run deploy:token:sepolia
-  ```
+---
 
-### Contract Verification on Etherscan (Sepolia)
+## 10. Contract Addresses & Transaction Hashes
+
+### Local Demonstration Deployments (Hardhat Network Chain ID 31337)
+- **Deployer**: `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`
+- **PayrollConfig Address**: `0x5FbDB2315678afecb367f032d93F642f64180aa3`
+- **PayrollCredit Address**: `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512`
+- **Rate Update Tx Hash**: `0x79fa200064de766291cfd8f862758c693c7ea47d39fefd1634d67066b30f50d9`
+- **PAYC Transfer Tx Hash**: `0x3d788845cf74122d3ee99b66bbb40ce8762521eeae75efeb1f2b3c2fbdc2fd82`
+
+*(For live Sepolia testnet, deploy using `npm run deploy:sepolia` once valid testnet credentials and faucet funds are supplied in `.env`).*
+
+---
+
+## 11. Source-Verification Links
+
 Once deployed to Sepolia, verify contract source code with:
 ```bash
 npx hardhat verify --network sepolia <DEPLOYED_CONFIG_ADDRESS>
 npx hardhat verify --network sepolia <DEPLOYED_TOKEN_ADDRESS>
 ```
-*(No constructor arguments are required for either contract).*
+
+**Etherscan Block Explorer Links Template:**
+- Sepolia Explorer: [https://sepolia.etherscan.io](https://sepolia.etherscan.io)
+- PayrollConfig Contract: `https://sepolia.etherscan.io/address/<DEPLOYED_CONFIG_ADDRESS>#code`
+- PayrollCredit Contract: `https://sepolia.etherscan.io/address/<DEPLOYED_TOKEN_ADDRESS>#code`
+
+---
+
+## 12. Interaction Commands and Actual Output
+
+### 12.1 PayrollConfig Demonstration
+Run:
+```bash
+npx hardhat run scripts/interact-config.js
+```
+
+**Actual Output:**
+```text
+====================================================
+       PayrollConfig Contract Demonstration
+====================================================
+Network: hardhat
+Admin account:     0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+Non-admin account: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+Deploying fresh PayrollConfig instance for demonstration...
+Contract Address:  0x5FbDB2315678afecb367f032d93F642f64180aa3
+Administrator:     0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+Initial Rate:      0
+
+[Admin Action] Setting payroll rate to 5000...
+Transaction submitted. Hash: 0x79fa200064de766291cfd8f862758c693c7ea47d39fefd1634d67066b30f50d9
+Transaction confirmed in block: 2
+Updated Rate:      5000
+
+[Security Verification] Testing unauthorized setter call rejection...
+✔ Revert confirmed: Non-admin setter call was rejected!
+  Revert Reason: VM Exception while processing transaction: reverted with reason string 'PayrollConfig: caller is not the administrator'
+Rate after unauthorized attempt: 5000
+✔ Stored value remains protected and unchanged at 5000.
+====================================================
+```
+
+### 12.2 PayrollCredit (PAYC) Demonstration
+Run:
+```bash
+npx hardhat run scripts/interact-token.js
+```
+
+**Actual Output:**
+```text
+====================================================
+     PayrollCredit (PAYC) Token Demonstration
+====================================================
+Network: hardhat
+Deployer account:  0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+Recipient account: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+Deploying fresh PayrollCredit instance for demonstration...
+
+--- Token Metadata ---
+Contract Address:   0x5FbDB2315678afecb367f032d93F642f64180aa3
+Token Name:         Payroll Credit
+Token Symbol:       PAYC
+Token Decimals:     18
+Total Supply:       1000000.0 PAYC
+Deployer Balance:   1000000.0 PAYC
+Recipient Balance:  0.0 PAYC
+
+[Transfer Action] Transferring 100 PAYC to recipient...
+Transaction submitted. Hash: 0x3d788845cf74122d3ee99b66bbb40ce8762521eeae75efeb1f2b3c2fbdc2fd82
+Transaction confirmed in block: 2
+
+--- Balances After Transfer ---
+Deployer Balance:   999900.0 PAYC
+Recipient Balance:  100.0 PAYC
+Total Supply:       1000000.0 PAYC
+✔ Total supply verified unchanged.
+====================================================
+```
+
+---
+
+## 13. Security Considerations
+
+1. **Access Control**: Administrative functions in `PayrollConfig` are restricted via `onlyAdmin`. Unauthorized callers are explicitly rejected.
+2. **Supply Cap & Minting Protection**: `PayrollCredit` does not expose any external minting functions. The supply cannot be arbitrarily inflated.
+3. **Private Key Safety**: `.env` is explicitly ignored by Git. No sensitive keys or API secrets are hardcoded or tracked in version control.
+4. **Gas Protection**: Simulation via static calls is used during demonstration to test revert logic without wasting testnet gas.
+5. **Mainnet Safeguard**: Project configurations and scripts are locked to Hardhat local networks and Sepolia testnet only. Mainnet deployment is prohibited.

@@ -1,0 +1,5 @@
+=== System & Framework Toolchain Versions ===
+Node.js:  v24.17.0
+npm:      11.13.0
+Hardhat:  2.29.1
+Solidity: 0.8.24 (Configured via hardhat.config.js, EVM: paris)
